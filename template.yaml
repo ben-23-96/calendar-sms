@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template for a calendar application containing Java Lambda functions with an API Gateway and DynamoDB database.
+
+Globals:
+  Function:
+    Timeout: 60 
+
+Resources:
+  ReceiveMessage:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.ben.ReceiveMessage::handleRequest 
+      Runtime: java21 
+      CodeUri: receive-message
+      MemorySize: 512
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17' # Policy to allow DynamoDB access
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CalendarTable.Arn
+      Events:
+        MyApi:
+          Type: Api
+          Properties:
+            Path: /recieve 
+            Method: post
+
+  SendMessage:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.ben.SendMessage::handleRequest
+      Runtime: java21
+      CodeUri: send-message
+      MemorySize: 512
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17' # Policy to allow DynamoDB access
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Scan
+                - dynamodb:Query
+              Resource: !GetAtt CalendarTable.Arn
+      Events:
+        SendMessageSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 8 * * ? *) # Every day at 8 AM UTC
+            Enabled: True
+
+  CalendarTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: calendarTable
+      PrimaryKey:
+        Name: eventName
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+Outputs:
+  MyApi:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/myresource/"
+  ReceiveMessageArn:
+    Description: "ReceiveMessage Lambda Function ARN"
+    Value: !GetAtt ReceiveMessage.Arn
+  CalendarTableArn:
+    Description: "DynamoDB Table ARN"
+    Value: !GetAtt CalendarTable.Arn

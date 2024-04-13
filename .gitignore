@@ -1,0 +1,4 @@
+plan.txt
+env.json
+.aws-sam
+**/target/
